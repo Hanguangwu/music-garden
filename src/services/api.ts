@@ -10,12 +10,14 @@ export interface ApiConfig {
   tuneHubBase: string
   metingBase: string
   jbsouBase: string
+  corsProxy: string
 }
 
 export const defaultApiConfig: ApiConfig = {
   tuneHubBase: 'https://music-dl.sayqz.com',
   metingBase: 'https://api.qijieya.cn/meting',
   jbsouBase: 'https://www.jbsou.cn',
+  corsProxy: 'https://corsproxy.io/?',
 }
 
 // Source name mappings
@@ -72,6 +74,10 @@ export async function resolveUrl(url: string, timeout = 10000): Promise<string> 
   }
 }
 
+function proxyUrl(url: string, config: ApiConfig): string {
+  return `${config.corsProxy}${encodeURIComponent(url)}`
+}
+
 /** Helper: fetch with timeout */
 async function fetchWithTimeout(url: string, options: RequestInit = {}, timeout = 10000): Promise<Response> {
   const controller = new AbortController()
@@ -96,7 +102,7 @@ async function searchTuneHub(
 ): Promise<SongInfo[]> {
   try {
     const url = `${config.tuneHubBase}/api/?source=${source}&type=search&keyword=${encodeURIComponent(keyword)}&limit=${limit}`
-    const resp = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } })
+    const resp = await fetchWithTimeout(proxyUrl(url, config), { headers: { 'Accept': 'application/json' } })
     if (!resp.ok) return []
     const data = await resp.json()
     if (data.code !== 200 || !data.data?.results) return []
@@ -134,7 +140,7 @@ async function searchMeting(
 
   try {
     const url = `${config.metingBase}/?server=${server}&type=search&name=${encodeURIComponent(keyword)}&limit=${limit}`
-    const resp = await fetchWithTimeout(url, { headers: { 'Accept': 'application/json' } })
+    const resp = await fetchWithTimeout(proxyUrl(url, config), { headers: { 'Accept': 'application/json' } })
     if (!resp.ok) return []
     const results = await resp.json()
     if (!Array.isArray(results)) return []
@@ -174,7 +180,7 @@ async function searchJBSou(
     formData.append('type', source)
     formData.append('page', '1')
 
-    const resp = await fetchWithTimeout(config.jbsouBase, {
+    const resp = await fetchWithTimeout(proxyUrl(config.jbsouBase, config), {
       method: 'POST',
       headers: {
         'Content-Type': 'application/x-www-form-urlencoded',
@@ -275,7 +281,7 @@ export async function getLyrics(song: SongInfo): Promise<{ time: number; text: s
   if (!lrcUrl) return []
 
   try {
-    const resp = await fetchWithTimeout(lrcUrl)
+    const resp = await fetchWithTimeout(proxyUrl(lrcUrl, defaultApiConfig))
     if (!resp.ok) return []
     const text = await resp.text()
     return parseLRC(text)
